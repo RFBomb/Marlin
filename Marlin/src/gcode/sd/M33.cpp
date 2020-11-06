@@ -41,8 +41,8 @@
  */
 void GcodeSuite::M33() {
 
-  card.printLongPath(parser.string_arg);
-
+  card.printLongPath(parser.string_arg, true);
+  
 }
 
 #endif // LONG_FILENAME_HOST_SUPPORT
