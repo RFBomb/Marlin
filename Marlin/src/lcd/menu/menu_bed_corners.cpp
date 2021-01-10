@@ -44,10 +44,6 @@
   #define LEVEL_CORNERS_HEIGHT 0.0
 #endif
 
-#ifndef LEVEL_CORNERS_LEVELING_ORDER
-  #define LEVEL_CORNERS_LEVELING_ORDER {1, 2, 3, 4} 
-#endif
-
 #if ENABLED(LEVEL_CORNERS_USE_PROBE)
   #include "../../module/probe.h"
   #include "../../module/endstops.h"
@@ -55,18 +51,15 @@
     #include "../../feature/bltouch.h"
   #endif
   #ifndef LEVEL_CORNERS_PROBE_TOLERANCE
-    #define LEVEL_CORNERS_PROBE_TOLERANCE 0.1
+    #define LEVEL_CORNERS_PROBE_TOLERANCE 0.2
   #endif
-  #if ENABLED(LEVEL_CORNERS_AUDIO_FEEDBACK)
-    #include "../../libs/buzzer.h"
-    #define PROBE_BUZZ() BUZZ(200, 600)
-  #else
-    #define PROBE_BUZZ() NOOP
-  #endif
-  static float last_z;
-  static bool corner_probing_done;
-  static bool verify_corner;
-  static int good_points;
+  float last_z;
+  int good_points;
+  bool corner_probing_done, wait_for_probe;
+#endif
+
+#ifndef LEVEL_CORNERS_LEVELING_ORDER
+  #define LEVEL_CORNERS_LEVELING_ORDER {1, 2, 3, 4} 
 #endif
 
 static_assert(LEVEL_CORNERS_Z_HOP >= 0, "LEVEL_CORNERS_Z_HOP must be >= 0. Please update your configuration.");
@@ -79,33 +72,15 @@ extern const char G28_STR[];
 
 static int8_t bed_corner;
 
+constexpr int lco[4] = LEVEL_CORNERS_LEVELING_ORDER;
+constexpr float inset_lfrb[4] = LEVEL_CORNERS_INSET_LFRB;
+constexpr xy_pos_t lf { (X_MIN_BED) + inset_lfrb[0], (Y_MIN_BED) + inset_lfrb[1] },
+                   rb { (X_MAX_BED) - inset_lfrb[2], (Y_MAX_BED) - inset_lfrb[3] };
 
 /**
- * Routine that defines the leveling points used in bed corner leveling
+ * Select next corner coordinates
  */
-
-static inline void _lcd_level_bed_corners_NextPosition() {
-  
-  constexpr int lco[4] = LEVEL_CORNERS_LEVELING_ORDER;
-  constexpr float lfrb[4] = LEVEL_CORNERS_INSET_LFRB;
-
-  // Setup corner positions
-  #if ENABLED(LEVEL_CORNERS_USE_PROBE)
-    xy_pos_t lf { (X_MIN_BED) + lfrb[0] - probe.offset_xy.x , (Y_MIN_BED) + lfrb[1] - probe.offset_xy.y },
-             rb { (X_MAX_BED) - lfrb[2] - probe.offset_xy.x , (Y_MAX_BED) - lfrb[3] - probe.offset_xy.y };
-  #else
-    constexpr xy_pos_t lf { (X_MIN_BED) + lfrb[0], (Y_MIN_BED) + lfrb[1] },
-                       rb { (X_MAX_BED) - lfrb[2], (Y_MAX_BED) - lfrb[3] };
-  #endif
-
-  //Setup the center position
-  #if ENABLED(LEVEL_CENTER_TOO) || ENABLED(LEVEL_CORNERS_3_POINTS)
-    #if ENABLED(LEVEL_CORNERS_USE_PROBE)
-      xy_pos_t midxy {X_CENTER - probe.offset_xy.x, Y_CENTER - probe.offset_xy.y};
-    #else
-      xy_pos_t midxy {X_CENTER, Y_CENTER};
-    #endif
-  #endif
+static inline void _lcd_level_bed_corners_get_next_position() {
 
   #if ENABLED(LEVEL_CORNERS_3_POINTS)
     if ( bed_corner + 1 <= 2 ) { 
@@ -118,20 +93,18 @@ static inline void _lcd_level_bed_corners_NextPosition() {
       }
     } else { 
       if (bed_corner + 1 == 3) { //Determine which edge to probe for 3rd point
-        if (( lco[0] == 1 &&  lco[1] == 2 ) || ( lco[0] == 2  &&  lco[1] == 1 )) { current_position.x = midxy.x; current_position.y = rb.y;  }; // Rear Edge
-        if (( lco[0] == 1 &&  lco[3] == 2 ) || ( lco[0] == 2  &&  lco[3] == 1 )) { current_position.x = rb.x; current_position.y = midxy.y;  }; // Right Edge
-        if (( lco[1] == 1 &&  lco[2] == 2 ) || ( lco[1] == 2  &&  lco[2] == 1 )) { current_position.x = lf.x; current_position.y = midxy.y;  }; // Left Edge
-        if (( lco[2] == 1 &&  lco[3] == 2 ) || ( lco[2] == 2  &&  lco[3] == 1 )) { current_position.x = midxy.x; current_position.y = lf.y;  }; // Front Edge
-        #if DISABLED(LEVEL_CENTER_TOO) 
+        if (( lco[0] == 1 &&  lco[1] == 2 ) || ( lco[0] == 2  &&  lco[1] == 1 )) { current_position.x = X_CENTER; current_position.y = rb.y;  }; // Rear Edge
+        if (( lco[0] == 1 &&  lco[3] == 2 ) || ( lco[0] == 2  &&  lco[3] == 1 )) { current_position.x = rb.x; current_position.y = Y_CENTER;  }; // Right Edge
+        if (( lco[1] == 1 &&  lco[2] == 2 ) || ( lco[1] == 2  &&  lco[2] == 1 )) { current_position.x = lf.x; current_position.y = Y_CENTER;  }; // Left Edge
+        if (( lco[2] == 1 &&  lco[3] == 2 ) || ( lco[2] == 2  &&  lco[3] == 1 )) { current_position.x = X_CENTER; current_position.y = lf.y;  }; // Front Edge
+        #if DISABLED(LEVEL_CENTER_TOO) && ENABLED(LEVEL_CORNERS_USE_PROBE) 
           good_points++; //Not performing center of bed probe -> add 1 to count to make this the last probe point.
         #endif
       
+      #if ENABLED(LEVEL_CENTER_TOO)
       }else if (bed_corner + 1 == 4 ) {
-        #if ENABLED(LEVEL_CENTER_TOO) 
-          current_position = midxy;
-        #else
-          //Do Nothing
-        #endif
+          current_position.set(X_CENTER, Y_CENTER);
+      #endif
       }       
 
     } ;
@@ -145,148 +118,172 @@ static inline void _lcd_level_bed_corners_NextPosition() {
       case lco[3]: current_position.x = lf.x; current_position.y = rb.y;break; // left rear  
       #if ENABLED(LEVEL_CENTER_TOO)
           case 5: 
-            current_position = midxy; 
+            current_position.set(X_CENTER, Y_CENTER);
             #if ENABLED(LEVEL_CORNERS_USE_PROBE) 
-              good_points--;
+              good_points--; //Decrement to allow one additional probe point
             #endif
             break;
       #endif
     }
   #endif
-
+  
 }
+
 
 /**
  * Level corners, starting in the front-left corner.
  */
 #if ENABLED(LEVEL_CORNERS_USE_PROBE)
 
-  static inline void _lcd_level_bed_corners_probing() {
-    ui.goto_screen([]{ MenuItem_static::draw((LCD_HEIGHT - 1) / 2, GET_TEXT(MSG_PROBING_MESH)); });
+  #define VALIDATE_POINT(X, Y, STR) static_assert(Probe::build_time::can_reach((X), (Y)), \
+    "LEVEL_CORNERS_INSET_LFRB " STR " inset is not reachable with the default NOZZLE_TO_PROBE offset and PROBING_MARGIN.")
+  VALIDATE_POINT(lf.x, Y_CENTER, "left"); VALIDATE_POINT(X_CENTER, lf.y, "front");
+  VALIDATE_POINT(rb.x, Y_CENTER, "right"); VALIDATE_POINT(X_CENTER, rb.y, "back");
 
-    do_blocking_move_to_z(LEVEL_CORNERS_Z_HOP - probe.offset.z);
-
-    _lcd_level_bed_corners_NextPosition();
-
-    do_blocking_move_to_xy(current_position);
-
-    #if ENABLED(BLTOUCH) && DISABLED(BLTOUCH_HS_MODE)
-      bltouch.deploy(); // DEPLOY in LOW SPEED MODE on every probe action
-    #endif
-    TERN_(HAS_QUIET_PROBING, probe.set_probing_paused(true));
-
-    // Move down until the probe is triggered
-    do_blocking_move_to_z(last_z - (LEVEL_CORNERS_PROBE_TOLERANCE), manual_feedrate_mm_s.z);
-
-    // Check to see if the probe was triggered
-    bool probe_triggered = TEST(endstops.trigger_state(), TERN(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN, Z_MIN, Z_MIN_PROBE));
-    if (!probe_triggered) {
-
-      static bool wait_for_probe;
-
-      ui.goto_screen([]{
-        MenuItem_confirm::select_screen(
-          GET_TEXT(MSG_BUTTON_DONE), GET_TEXT(MSG_BUTTON_SKIP)
-          , []{ corner_probing_done = true;
-                wait_for_probe = false;
-                TERN_(HAS_LEVELING, set_bed_leveling_enabled(leveling_was_active));
-                ui.goto_previous_screen_no_defer();
-            }
-          , []{ wait_for_probe = false; }
-          , GET_TEXT(MSG_LEVEL_CORNERS_RAISE)
-          , (const char*)nullptr, PSTR("")
-        );
-      });
-      ui.set_selection(true);
-
-      wait_for_probe = true;
-      while (wait_for_probe && !probe_triggered) {
-        probe_triggered = PROBE_TRIGGERED();
-        if (probe_triggered) PROBE_BUZZ();
-        idle();
-      }
-      wait_for_probe = false;
-
-      TERN_(LEVEL_CORNERS_VERIFY_RAISED, verify_corner = true);
-    }
-
-    TERN_(HAS_QUIET_PROBING, probe.set_probing_paused(false));
-
-    #if ENABLED(BLTOUCH) && DISABLED(BLTOUCH_HS_MODE)
-      bltouch.stow();
-    #endif
-
-    if (probe_triggered) {
-      endstops.hit_on_purpose();
-      if (!WITHIN(current_position.z, last_z - (LEVEL_CORNERS_PROBE_TOLERANCE), last_z + (LEVEL_CORNERS_PROBE_TOLERANCE))) {
-        last_z = current_position.z;
-        good_points = 0;
-      }
-      if (!verify_corner) good_points++;
-    }
-
-    if (!corner_probing_done) {
-      if (!verify_corner) bed_corner++;
-      if (bed_corner > 3) bed_corner = 0;
-      verify_corner = false;
-      if (good_points < 4)
-        _lcd_level_bed_corners_probing();
-      else {
-        ui.goto_screen([]{
-          MenuItem_confirm::confirm_screen(
-            []{ ui.goto_previous_screen_no_defer();
-                queue.inject_P(TERN(HAS_LEVELING, PSTR("G28\nG29"), G28_STR));
-              }
-            , []{ ui.goto_previous_screen_no_defer(); }
-            , GET_TEXT(MSG_LEVEL_CORNERS_IN_RANGE)
-            , (const char*)nullptr, PSTR("?")
-          );
-        });
-        ui.set_selection(true);
-      }
-    }
+  void _lcd_draw_probing() {
+    if (ui.should_draw()) MenuItem_static::draw((LCD_HEIGHT - 1) / 2, GET_TEXT(MSG_PROBING_MESH));
   }
 
-#else
+  void _lcd_draw_raise() {
+    if (!ui.should_draw()) return;
+    MenuItem_confirm::select_screen(
+      GET_TEXT(MSG_BUTTON_DONE), GET_TEXT(MSG_BUTTON_SKIP)
+      , []{ corner_probing_done = true; wait_for_probe = false; }
+      , []{ wait_for_probe = false; }
+      , GET_TEXT(MSG_LEVEL_CORNERS_RAISE)
+      , (const char*)nullptr, PSTR("")
+    );
+  }
+
+  void _lcd_draw_level_prompt() {
+    if (!ui.should_draw()) return;
+    MenuItem_confirm::confirm_screen(
+      []{ queue.inject_P(TERN(HAS_LEVELING, PSTR("G28\nG29"), G28_STR));
+          ui.return_to_status();
+      }
+      , []{ ui.goto_previous_screen_no_defer(); }
+      , GET_TEXT(MSG_LEVEL_CORNERS_IN_RANGE)
+      , (const char*)nullptr, PSTR("?")
+    );
+  }
+
+  bool _lcd_level_bed_corners_probe(bool verify=false) {
+    if (verify) do_blocking_move_to_z(current_position.z + LEVEL_CORNERS_Z_HOP); // do clearance if needed
+    TERN_(BLTOUCH_SLOW_MODE, bltouch.deploy()); // Deploy in LOW SPEED MODE on every probe action
+    do_blocking_move_to_z(last_z - LEVEL_CORNERS_PROBE_TOLERANCE, manual_feedrate_mm_s.z); // Move down to lower tolerance
+    if (TEST(endstops.trigger_state(), TERN(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN, Z_MIN, Z_MIN_PROBE))) { // check if probe triggered
+      endstops.hit_on_purpose();
+      set_current_from_steppers_for_axis(Z_AXIS);
+      sync_plan_position();
+      TERN_(BLTOUCH_SLOW_MODE, bltouch.stow()); // Stow in LOW SPEED MODE on every trigger
+      // Triggered outside tolerance range?
+      if (ABS(current_position.z - last_z) > LEVEL_CORNERS_PROBE_TOLERANCE) {
+        last_z = current_position.z; // Above tolerance. Set a new Z for subsequent corners.
+        good_points = 0;             // ...and start over
+      }
+      return true; // probe triggered
+    }
+    do_blocking_move_to_z(last_z); // go back to tolerance middle point before raise
+    return false; // probe not triggered
+  }
+
+  bool _lcd_level_bed_corners_raise() {
+    bool probe_triggered = false;
+    corner_probing_done = false;
+    wait_for_probe = true;
+    ui.goto_screen(_lcd_draw_raise); // show raise screen
+    ui.set_selection(true);
+    while (wait_for_probe && !probe_triggered) { //loop while waiting to bed raise and probe trigger
+      probe_triggered = PROBE_TRIGGERED();
+      if (probe_triggered) {
+        endstops.hit_on_purpose();
+        TERN_(LEVEL_CORNERS_AUDIO_FEEDBACK, ui.buzz(200, 600));
+      }
+      idle();
+    }
+    TERN_(BLTOUCH_SLOW_MODE, bltouch.stow());
+    ui.goto_screen(_lcd_draw_probing);
+    return (probe_triggered);
+  }
+
+  void _lcd_test_corners() {
+    ui.goto_screen(_lcd_draw_probing);
+    bed_corner = TERN(LEVEL_CENTER_TOO, 4, 0);
+    last_z = LEVEL_CORNERS_HEIGHT;
+    endstops.enable_z_probe(true);
+    good_points = 0;
+
+    do {
+      do_blocking_move_to_z(current_position.z + LEVEL_CORNERS_Z_HOP); // clearance
+      // Select next corner coordinates
+      _lcd_level_bed_corners_get_next_position();
+      current_position = current_position - probe.offset_xy; // Account for probe offsets
+      do_blocking_move_to_xy(current_position);           // Goto corner
+
+      if (!_lcd_level_bed_corners_probe()) {              // Probe down to tolerance
+        if (_lcd_level_bed_corners_raise()) {             // Prompt user to raise bed if needed
+          #if ENABLED(LEVEL_CORNERS_VERIFY_RAISED)        // Verify
+            while (!_lcd_level_bed_corners_probe(true)) { // Loop while corner verified
+              if (!_lcd_level_bed_corners_raise()) {      // Prompt user to raise bed if needed
+                if (corner_probing_done) return;          // Done was selected
+                break;                                    // Skip was selected
+              }
+            }
+          #endif
+        }
+        else if (corner_probing_done)                     // Done was selected
+          return;
+      }
+
+      if (bed_corner != 4) good_points++; // ignore center
+      if (++bed_corner > 3) bed_corner = 0;
+
+    } while (good_points < 4); // loop until all corners whitin tolerance
+
+    ui.goto_screen(_lcd_draw_level_prompt); // prompt for bed leveling
+    ui.set_selection(true);
+  }
+
+#else // !LEVEL_CORNERS_USE_PROBE
 
   static inline void _lcd_goto_next_corner() {
-
     line_to_z(LEVEL_CORNERS_Z_HOP);
-    
-    _lcd_level_bed_corners_NextPosition();
 
+    //Select next corner coordinates
+    _lcd_level_bed_corners_get_next_position();
+    
     line_to_current_position(manual_feedrate_mm_s.x);
     line_to_z(LEVEL_CORNERS_HEIGHT);
     if (++bed_corner > 3 + ENABLED(LEVEL_CENTER_TOO)) bed_corner = 0;
   }
 
-#endif
+#endif // !LEVEL_CORNERS_USE_PROBE
 
 static inline void _lcd_level_bed_corners_homing() {
   _lcd_draw_homing();
-  if (all_axes_homed()) {
-    #if ENABLED(LEVEL_CORNERS_USE_PROBE)
-      TERN_(LEVEL_CENTER_TOO, bed_corner = 4);
-      endstops.enable_z_probe(true);
-      ui.goto_screen(_lcd_level_bed_corners_probing);
-    #else
-      bed_corner = 0;
-      ui.goto_screen([]{
-        MenuItem_confirm::select_screen(
-            GET_TEXT(MSG_BUTTON_NEXT), GET_TEXT(MSG_BUTTON_DONE)
-          , _lcd_goto_next_corner
-          , []{
-              TERN_(HAS_LEVELING, set_bed_leveling_enabled(leveling_was_active));
-              ui.goto_previous_screen_no_defer();
-            }
-          , GET_TEXT(TERN(LEVEL_CENTER_TOO, MSG_LEVEL_BED_NEXT_POINT, MSG_NEXT_CORNER))
-          , (const char*)nullptr, PSTR("?")
-        );
-      });
-      ui.set_selection(true);
-      _lcd_goto_next_corner();
-    #endif
-  }
+  if (!all_axes_homed()) return;
+  #if ENABLED(LEVEL_CORNERS_USE_PROBE)
+    _lcd_test_corners();
+    if (corner_probing_done) ui.goto_previous_screen_no_defer();
+    TERN_(HAS_LEVELING, set_bed_leveling_enabled(leveling_was_active));
+    endstops.enable_z_probe(false);
+  #else
+    bed_corner = 0;
+    ui.goto_screen([]{
+      MenuItem_confirm::select_screen(
+          GET_TEXT(MSG_BUTTON_NEXT), GET_TEXT(MSG_BUTTON_DONE)
+        , _lcd_goto_next_corner
+        , []{
+            TERN_(HAS_LEVELING, set_bed_leveling_enabled(leveling_was_active));
+            ui.goto_previous_screen_no_defer();
+          }
+        , GET_TEXT(TERN(LEVEL_CENTER_TOO, MSG_LEVEL_BED_NEXT_POINT, MSG_NEXT_CORNER))
+        , (const char*)nullptr, PSTR("?")
+      );
+    });
+    ui.set_selection(true);
+    _lcd_goto_next_corner();
+  #endif
 }
 
 void _lcd_level_bed_corners() {
@@ -300,13 +297,6 @@ void _lcd_level_bed_corners() {
   #if HAS_LEVELING
     leveling_was_active = planner.leveling_active;
     set_bed_leveling_enabled(false);
-  #endif
-
-  #if ENABLED(LEVEL_CORNERS_USE_PROBE)
-    last_z = LEVEL_CORNERS_HEIGHT;
-    corner_probing_done = false;
-    verify_corner = false;
-    good_points = 0;
   #endif
 
   ui.goto_screen(_lcd_level_bed_corners_homing);
