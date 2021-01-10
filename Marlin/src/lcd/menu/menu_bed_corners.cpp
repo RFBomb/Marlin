@@ -44,6 +44,10 @@
   #define LEVEL_CORNERS_HEIGHT 0.0
 #endif
 
+#ifndef LEVEL_CORNERS_LEVELING_ORDER
+  #define LEVEL_CORNERS_LEVELING_ORDER {1, 2, 3, 4} 
+#endif
+
 #if ENABLED(LEVEL_CORNERS_USE_PROBE)
   #include "../../module/probe.h"
   #include "../../module/endstops.h"
@@ -75,6 +79,83 @@ extern const char G28_STR[];
 
 static int8_t bed_corner;
 
+
+/**
+ * Routine that defines the leveling points used in bed corner leveling
+ */
+
+static inline void _lcd_level_bed_corners_NextPosition() {
+  
+  constexpr int lco[4] = LEVEL_CORNERS_LEVELING_ORDER;
+  constexpr float lfrb[4] = LEVEL_CORNERS_INSET_LFRB;
+
+  // Setup corner positions
+  #if ENABLED(LEVEL_CORNERS_USE_PROBE)
+    xy_pos_t lf { (X_MIN_BED) + lfrb[0] - probe.offset_xy.x , (Y_MIN_BED) + lfrb[1] - probe.offset_xy.y },
+             rb { (X_MAX_BED) - lfrb[2] - probe.offset_xy.x , (Y_MAX_BED) - lfrb[3] - probe.offset_xy.y };
+  #else
+    constexpr xy_pos_t lf { (X_MIN_BED) + lfrb[0], (Y_MIN_BED) + lfrb[1] },
+                       rb { (X_MAX_BED) - lfrb[2], (Y_MAX_BED) - lfrb[3] };
+  #endif
+
+  //Setup the center position
+  #if ENABLED(LEVEL_CENTER_TOO) || ENABLED(LEVEL_CORNERS_3_POINTS)
+    #if ENABLED(LEVEL_CORNERS_USE_PROBE)
+      xy_pos_t midxy {X_CENTER - probe.offset_xy.x, Y_CENTER - probe.offset_xy.y};
+    #else
+      xy_pos_t midxy {X_CENTER, Y_CENTER};
+    #endif
+  #endif
+
+  #if ENABLED(LEVEL_CORNERS_3_POINTS)
+    if ( bed_corner + 1 <= 2 ) { 
+      //use switch case statement to find first two corners
+      switch (bed_corner + 1 ) {
+        case lco[0]: current_position   = lf; break; // left front
+        case lco[1]: current_position.x = rb.x; current_position.y = lf.y; break; // right front
+        case lco[2]: current_position   = rb; break; // right rear
+        case lco[3]: current_position.x = lf.x; current_position.y = rb.y;break; // left rear  
+      }
+    } else { 
+      if (bed_corner + 1 == 3) { //Determine which edge to probe for 3rd point
+        if (( lco[0] == 1 &&  lco[1] == 2 ) || ( lco[0] == 2  &&  lco[1] == 1 )) { current_position.x = midxy.x; current_position.y = rb.y;  }; // Rear Edge
+        if (( lco[0] == 1 &&  lco[3] == 2 ) || ( lco[0] == 2  &&  lco[3] == 1 )) { current_position.x = rb.x; current_position.y = midxy.y;  }; // Right Edge
+        if (( lco[1] == 1 &&  lco[2] == 2 ) || ( lco[1] == 2  &&  lco[2] == 1 )) { current_position.x = lf.x; current_position.y = midxy.y;  }; // Left Edge
+        if (( lco[2] == 1 &&  lco[3] == 2 ) || ( lco[2] == 2  &&  lco[3] == 1 )) { current_position.x = midxy.x; current_position.y = lf.y;  }; // Front Edge
+        #if DISABLED(LEVEL_CENTER_TOO) 
+          good_points++; //Not performing center of bed probe -> add 1 to count to make this the last probe point.
+        #endif
+      
+      }else if (bed_corner + 1 == 4 ) {
+        #if ENABLED(LEVEL_CENTER_TOO) 
+          current_position = midxy;
+        #else
+          //Do Nothing
+        #endif
+      }       
+
+    } ;
+
+  #else
+    switch (bed_corner + 1 ) {
+      //standard corners
+      case lco[0]: current_position   = lf; break; // left front
+      case lco[1]: current_position.x = rb.x; current_position.y = lf.y; break; // right front
+      case lco[2]: current_position   = rb; break; // right rear
+      case lco[3]: current_position.x = lf.x; current_position.y = rb.y;break; // left rear  
+      #if ENABLED(LEVEL_CENTER_TOO)
+          case 5: 
+            current_position = midxy; 
+            #if ENABLED(LEVEL_CORNERS_USE_PROBE) 
+              good_points--;
+            #endif
+            break;
+      #endif
+    }
+  #endif
+
+}
+
 /**
  * Level corners, starting in the front-left corner.
  */
@@ -83,21 +164,9 @@ static int8_t bed_corner;
   static inline void _lcd_level_bed_corners_probing() {
     ui.goto_screen([]{ MenuItem_static::draw((LCD_HEIGHT - 1) / 2, GET_TEXT(MSG_PROBING_MESH)); });
 
-    float lfrb[4] = LEVEL_CORNERS_INSET_LFRB;
-    xy_pos_t lf { (X_MIN_BED) + lfrb[0] - probe.offset_xy.x , (Y_MIN_BED) + lfrb[1] - probe.offset_xy.y },
-             rb { (X_MAX_BED) - lfrb[2] - probe.offset_xy.x , (Y_MAX_BED) - lfrb[3] - probe.offset_xy.y };
-
     do_blocking_move_to_z(LEVEL_CORNERS_Z_HOP - probe.offset.z);
 
-    switch (bed_corner) {
-      case 0: current_position   = lf;   break; // copy xy
-      case 1: current_position.x = rb.x; break;
-      case 2: current_position.y = rb.y; break;
-      case 3: current_position.x = lf.x; break;
-      #if ENABLED(LEVEL_CENTER_TOO)
-        case 4: current_position.set(X_CENTER - probe.offset_xy.x, Y_CENTER - probe.offset_xy.y); good_points--; break;
-      #endif
-    }
+    _lcd_level_bed_corners_NextPosition();
 
     do_blocking_move_to_xy(current_position);
 
@@ -181,19 +250,11 @@ static int8_t bed_corner;
 #else
 
   static inline void _lcd_goto_next_corner() {
-    constexpr float lfrb[4] = LEVEL_CORNERS_INSET_LFRB;
-    constexpr xy_pos_t lf { (X_MIN_BED) + lfrb[0], (Y_MIN_BED) + lfrb[1] },
-                       rb { (X_MAX_BED) - lfrb[2], (Y_MAX_BED) - lfrb[3] };
+
     line_to_z(LEVEL_CORNERS_Z_HOP);
-    switch (bed_corner) {
-      case 0: current_position   = lf;   break; // copy xy
-      case 1: current_position.x = rb.x; break;
-      case 2: current_position.y = rb.y; break;
-      case 3: current_position.x = lf.x; break;
-      #if ENABLED(LEVEL_CENTER_TOO)
-        case 4: current_position.set(X_CENTER, Y_CENTER); break;
-      #endif
-    }
+    
+    _lcd_level_bed_corners_NextPosition();
+
     line_to_current_position(manual_feedrate_mm_s.x);
     line_to_z(LEVEL_CORNERS_HEIGHT);
     if (++bed_corner > 3 + ENABLED(LEVEL_CENTER_TOO)) bed_corner = 0;

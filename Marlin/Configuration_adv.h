@@ -803,7 +803,9 @@
 #if ENABLED(ASSISTED_TRAMMING)
 
   // Define positions for probing points, use the hotend as reference not the sensor.
-  #define TRAMMING_POINT_XY { {  20, 20 }, { 200,  20 }, { 200, 200 }, { 20, 200 } }
+  #define TramX_Max  X_BED_SIZE - abs(ProbeOffset_X) -5
+  #define TramY_Max  Y_BED_SIZE - abs(ProbeOffset_Y) -15
+  #define TRAMMING_POINT_XY { {  15, 15 }, { TramX_Max,  15 }, { TramX_Max , TramY_Max }, { 15, TramY_Max } }
 
   // Define positions names for probing points.
   #define TRAMMING_POINT_NAME_1 "Front-Left"
@@ -814,9 +816,9 @@
   #define RESTORE_LEVELING_AFTER_G35    // Enable to restore leveling setup after operation
   #define REPORT_TRAMMING_MM          // Report Z deviation (mm) for each point relative to the first
 
-  //#define ASSISTED_TRAMMING_MENU_ITEM // Add a menu item to run G35 Assisted Tramming (MarlinUI)
-  //#define ASSISTED_TRAMMING_WIZARD    // Make the menu item open a Tramming Wizard sub-menu
-  //#define ASSISTED_TRAMMING_WAIT_POSITION { X_CENTER, Y_CENTER, 30 } // Move the nozzle out of the way for adjustment
+  #define ASSISTED_TRAMMING_MENU_ITEM // Add a menu item to run G35 Assisted Tramming (MarlinUI)
+  #define ASSISTED_TRAMMING_WIZARD    // Make the menu item open a Tramming Wizard sub-menu
+  #define ASSISTED_TRAMMING_WAIT_POSITION { X_CENTER, Y_CENTER, 30 } // Move the nozzle out of the way for adjustment
 
   /**
    * Screw thread:
@@ -2580,7 +2582,7 @@
   #define Z3_HYBRID_THRESHOLD    Z_HYBRID_THRESHOLD
   #define Z4_HYBRID_THRESHOLD    Z_HYBRID_THRESHOLD
   #define E0_HYBRID_THRESHOLD    100
-  #define E1_HYBRID_THRESHOLD    100
+  #define E1_HYBRID_THRESHOLD    E0_HYBRID_THRESHOLD
   #define E2_HYBRID_THRESHOLD    E0_HYBRID_THRESHOLD
   #define E3_HYBRID_THRESHOLD    E0_HYBRID_THRESHOLD
   #define E4_HYBRID_THRESHOLD    E0_HYBRID_THRESHOLD

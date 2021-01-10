@@ -737,7 +737,7 @@
  * Override with M92
  *                                      X, Y, Z, E0 [, E1[, E2...]]
  */
-#define DEFAULT_AXIS_STEPS_PER_UNIT   { 79.6, 80, 403, 130, 97.38 }
+#define DEFAULT_AXIS_STEPS_PER_UNIT   { 79.6, 80, 403, 137, 96 }
 
 /**
  * Default Max Feed Rate (mm/s)
@@ -994,7 +994,7 @@
  */
 #define ProbeOffset_X -55.0 //Being used for determining the MESH_MAX_XY values in Configuration_adv.h
 #define ProbeOffset_Y -12.0
-#define NOZZLE_TO_PROBE_OFFSET { ProbeOffset_X, ProbeOffset_Y, -1.00 }
+#define NOZZLE_TO_PROBE_OFFSET { ProbeOffset_X, ProbeOffset_Y, -1.75 }
 
 // Most probes should stay away from the edges of the bed, but
 // with NOZZLE_AS_PROBE this can be negative for a wider probing area.
@@ -1004,7 +1004,7 @@
 #define XY_PROBE_SPEED (133*60)
 
 // Feedrate (mm/min) for the first approach when double-probing (MULTIPLE_PROBING == 2)
-#define Z_PROBE_SPEED_FAST HOMING_FEEDRATE_Z
+#define Z_PROBE_SPEED_FAST 6*60
 
 // Feedrate (mm/min) for the "accurate" probe of each point
 #define Z_PROBE_SPEED_SLOW (Z_PROBE_SPEED_FAST / 2)
@@ -1150,7 +1150,7 @@
 #define HOME_AFTER_DEACTIVATE   // Require rehoming after steppers are deactivated. Also enable NO_MOTION_BEFORE_HOMING for extra safety.
 //#define UNKNOWN_Z_NO_RAISE      // Don't raise Z (lower the bed) if Z is "unknown." For beds that fall when Z is powered off.
 
-#define Z_HOMING_HEIGHT  10      // (mm) Minimal Z height before homing (G28) for Z clearance above the bed, clamps, ...
+#define Z_HOMING_HEIGHT  5      // (mm) Minimal Z height before homing (G28) for Z clearance above the bed, clamps, ...
                                   // Be sure to have this much clearance over your Z_MAX_POS to prevent grinding.
 
 #define Z_AFTER_HOMING  10      // (mm) Height to move to after homing Z
@@ -1165,15 +1165,16 @@
 
 // The size of the print bed
 #define X_BED_SIZE 230
-#define Y_BED_SIZE 225
+#define Y_BED_SIZE 228
 
 // Travel limits (mm) after homing, corresponding to endstop positions.
-#define X_MIN_POS 0
-#define Y_MIN_POS -10
+// Travel limits due to Microswiss Direct Drive X Carriage + Gulf Coast Robotics 3-Point Leveling Y Carriage 
+#define X_MIN_POS -5 
+#define Y_MIN_POS -17
 #define Z_MIN_POS 0
-#define X_MAX_POS 235 //X_BED_SIZE
-#define Y_MAX_POS 232 //Y_BED_SIZE
-#define Z_MAX_POS 200
+#define X_MAX_POS 231 //X_BED_SIZE
+#define Y_MAX_POS 228 //Y_BED_SIZE
+#define Z_MAX_POS 180
 
 /**
  * Software Endstops
@@ -1447,19 +1448,34 @@
 #endif
 
 // Add a menu item to move between bed corners for manual bed adjustment
-//#define LEVEL_BED_CORNERS
+#define LEVEL_BED_CORNERS
 
 #if ENABLED(LEVEL_BED_CORNERS)
-  #define LEVEL_CORNERS_INSET_LFRB { 5, 30, 30, 30 } // (mm) Left, Front, Right, Back insets
+  //#define LEVEL_CORNERS_INSET_LFRB { 5, abs(ProbeOffset_Y) + 3, abs(ProbeOffset_X), 30 } // (mm) Left, Front, Right, Back insets
+  #define LEVEL_CORNERS_INSET_LFRB { 5, abs(ProbeOffset_Y), 30, 30 } // (mm) Left, Front, Right, Back insets
   #define LEVEL_CORNERS_HEIGHT      0.0   // (mm) Z height of nozzle at leveling points
   #define LEVEL_CORNERS_Z_HOP       4.0   // (mm) Z height of nozzle between leveling points
   //#define LEVEL_CENTER_TOO              // Move to the center after the last corner
-  //#define LEVEL_CORNERS_USE_PROBE
+  #define LEVEL_CORNERS_USE_PROBE
   #if ENABLED(LEVEL_CORNERS_USE_PROBE)
     #define LEVEL_CORNERS_PROBE_TOLERANCE 0.1
     #define LEVEL_CORNERS_VERIFY_RAISED   // After adjustment triggers the probe, re-probe to verify
     //#define LEVEL_CORNERS_AUDIO_FEEDBACK
   #endif
+  /** 
+   * Define the order to move to locations during corner leveling. 
+   * FrontLeft, FrontRight, BackRight, BackLeft   = {1,2,3,4}  (This is the default)
+   * For LEVEL_CORNERS_3_POINTS, #1 then #2 will be probed first. Then the opposite edge will be selected as the third point. Values 3 and 4 will be ignored. 
+   * Examples:
+   *       Default            LEVEL_CORNERS_3_POINTS (default)        {1,3,4,2}                LEVEL_CORNERS_3_POINTS {1,3,4,2}
+   *  --------------------    --------------------               --------------------          --------------------
+   *  - 4              3 -    -        3         -               - 2              4 -          - 2                -
+   *  -                  -    -                  -               -                  -          -                3 -
+   *  - 1              2 -    - 1              2 -               - 1              3 -          - 1                -
+   *  --------------------    --------------------               --------------------          --------------------
+   */
+  #define LEVEL_CORNERS_LEVELING_ORDER {1, 3, 4, 2} 
+  #define LEVEL_CORNERS_3_POINTS                  // Level 3 points instead of 4 -> 2 Corners + middle of opposite side
 #endif
 
 /**
