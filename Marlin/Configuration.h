@@ -999,10 +999,10 @@
 #define XY_PROBE_SPEED (133*60)
 
 // Feedrate (mm/min) for the first approach when double-probing (MULTIPLE_PROBING == 2)
-#define Z_PROBE_SPEED_FAST 6*60
+#define Z_PROBE_SPEED_FAST 6*60 //HOMING_FEEDRATE_Z
 
 // Feedrate (mm/min) for the "accurate" probe of each point
-#define Z_PROBE_SPEED_SLOW (Z_PROBE_SPEED_FAST / 2)
+#define Z_PROBE_SPEED_SLOW 3*60 //(Z_PROBE_SPEED_FAST / 2)
 
 /**
  * Probe Activation Switch
@@ -1447,13 +1447,13 @@
 
 #if ENABLED(LEVEL_BED_CORNERS)
   //#define LEVEL_CORNERS_INSET_LFRB { 5, abs(ProbeOffset_Y) + 3, abs(ProbeOffset_X), 30 } // (mm) Left, Front, Right, Back insets
-  #define LEVEL_CORNERS_INSET_LFRB { 5, abs(ProbeOffset_Y), 30, 30 } // (mm) Left, Front, Right, Back insets
+  #define LEVEL_CORNERS_INSET_LFRB { 5, abs(ProbeOffset_Y), abs(ProbeOffset_X), 30 } // (mm) Left, Front, Right, Back insets
   #define LEVEL_CORNERS_HEIGHT      0.0   // (mm) Z height of nozzle at leveling points
   #define LEVEL_CORNERS_Z_HOP       4.0   // (mm) Z height of nozzle between leveling points
   //#define LEVEL_CENTER_TOO              // Move to the center after the last corner
   #define LEVEL_CORNERS_USE_PROBE
   #if ENABLED(LEVEL_CORNERS_USE_PROBE)
-    #define LEVEL_CORNERS_PROBE_TOLERANCE 0.1
+    #define LEVEL_CORNERS_PROBE_TOLERANCE 0.15
     #define LEVEL_CORNERS_VERIFY_RAISED   // After adjustment triggers the probe, re-probe to verify
     //#define LEVEL_CORNERS_AUDIO_FEEDBACK
   #endif
