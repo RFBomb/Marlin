@@ -804,26 +804,26 @@
 //
 // Add the G35 command to read bed corners to help adjust screws. Requires a bed probe.
 //
-//#define ASSISTED_TRAMMING
+#define ASSISTED_TRAMMING
 #if ENABLED(ASSISTED_TRAMMING)
 
   // Define positions for probing points, use the hotend as reference not the sensor.
   #define TramX_Max  X_BED_SIZE - abs(ProbeOffset_X) -5
   #define TramY_Max  Y_BED_SIZE - abs(ProbeOffset_Y) -15
-  #define TRAMMING_POINT_XY { {  15, 15 }, { TramX_Max,  15 }, { TramX_Max , TramY_Max }, { 15, TramY_Max } }
+  #define TRAMMING_POINT_XY { {  15, 15 }, { 15,  TramY_Max }, { TramX_Max , Y_CENTER }}
 
   // Define position names for probe points.
   #define TRAMMING_POINT_NAME_1 "Front-Left"
-  #define TRAMMING_POINT_NAME_2 "Front-Right"
-  #define TRAMMING_POINT_NAME_3 "Back-Right"
-  #define TRAMMING_POINT_NAME_4 "Back-Left"
+  #define TRAMMING_POINT_NAME_2 "Back-Left"
+  #define TRAMMING_POINT_NAME_3 "Center-Right"
+  //#define TRAMMING_POINT_NAME_4 "Back-Left"
 
   #define RESTORE_LEVELING_AFTER_G35    // Enable to restore leveling setup after operation
   #define REPORT_TRAMMING_MM          // Report Z deviation (mm) for each point relative to the first
 
-  #define ASSISTED_TRAMMING_MENU_ITEM // Add a menu item to run G35 Assisted Tramming (MarlinUI)
+  //#define ASSISTED_TRAMMING_MENU_ITEM // Add a menu item to run G35 Assisted Tramming (MarlinUI)
   #define ASSISTED_TRAMMING_WIZARD    // Make the menu item open a Tramming Wizard sub-menu
-  #define ASSISTED_TRAMMING_WAIT_POSITION { X_CENTER, Y_CENTER, 30 } // Move the nozzle out of the way for adjustment
+  #define ASSISTED_TRAMMING_WAIT_POSITION { X_CENTER, Y_BED_SIZE, 15 } // Move the nozzle out of the way for adjustment
 
   /**
    * Screw thread:
