@@ -810,13 +810,14 @@
   // Define positions for probing points, use the hotend as reference not the sensor.
   #define TramX_Max  X_BED_SIZE - abs(ProbeOffset_X) -5
   #define TramY_Max  Y_BED_SIZE - abs(ProbeOffset_Y) -15
-  #define TRAMMING_POINT_XY { {  15, 15 }, { 15,  TramY_Max }, { TramX_Max , Y_CENTER }}
+  #define TRAMMING_POINT_XY { {X_CENTER, Y_CENTER }, {  15, 15 }, { 15,  TramY_Max }, { TramX_Max , Y_CENTER }}
 
   // Define position names for probe points.
-  #define TRAMMING_POINT_NAME_1 "Front-Left"
-  #define TRAMMING_POINT_NAME_2 "Back-Left"
-  #define TRAMMING_POINT_NAME_3 "Center-Right"
-  //#define TRAMMING_POINT_NAME_4 "Back-Left"
+  #define TRAMMING_POINT_NAME_1 "Bed-Center"
+  #define TRAMMING_POINT_NAME_2 "Front-Left"
+  #define TRAMMING_POINT_NAME_3 "Back-Left"
+  #define TRAMMING_POINT_NAME_4 "Center-Right"
+  
 
   #define RESTORE_LEVELING_AFTER_G35    // Enable to restore leveling setup after operation
   #define REPORT_TRAMMING_MM          // Report Z deviation (mm) for each point relative to the first
@@ -1725,12 +1726,15 @@
  * Override if the automatically selected points are inadequate.
  */
 #if EITHER(AUTO_BED_LEVELING_3POINT, AUTO_BED_LEVELING_UBL)
-  //#define PROBE_PT_1_X 15
-  //#define PROBE_PT_1_Y 180
-  //#define PROBE_PT_2_X 15
-  //#define PROBE_PT_2_Y 20
-  //#define PROBE_PT_3_X 170
-  //#define PROBE_PT_3_Y 20
+  //Front Left
+  #define PROBE_PT_1_X 15
+  #define PROBE_PT_1_Y 20
+  //Rear Left
+  #define PROBE_PT_2_X PROBE_PT_1_X
+  #define PROBE_PT_2_Y Y_MAX_POS - PROBE_PT_1_Y
+  //Center RIght
+  #define PROBE_PT_3_X 170
+  #define PROBE_PT_3_Y PROBE_PT_2_Y - ((PROBE_PT_2_Y - PROBE_PT_1_Y) / 2)
 #endif
 
 /**
