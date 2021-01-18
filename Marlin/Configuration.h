@@ -1451,20 +1451,25 @@
     #define LEVEL_CORNERS_VERIFY_RAISED   // After adjustment triggers the probe, re-probe to verify
     //#define LEVEL_CORNERS_AUDIO_FEEDBACK
   #endif
-  /** 
-   * Define the order to move to locations during corner leveling. 
-   * FrontLeft, FrontRight, BackRight, BackLeft   = {1,2,3,4}  (This is the default)
-   * For LEVEL_CORNERS_3_POINTS, #1 then #2 will be probed first. Then the opposite edge will be selected as the third point. Values 3 and 4 will be ignored. 
+
+  /**
+   * Corner Leveling Order
+   *
+   * Set 2 or 4 points. When 2 points are given, the 3rd is the center of the opposite edge.
+   *
+   *  LF  Left-Front    RF  Right-Front
+   *  LB  Left-Back     RB  Right-Back
+   *
    * Examples:
-   *       Default            LEVEL_CORNERS_3_POINTS (default)        {1,3,4,2}                LEVEL_CORNERS_3_POINTS {1,3,4,2}
-   *  --------------------    --------------------               --------------------          --------------------
-   *  - 4              3 -    -        3         -               - 2              4 -          - 2                -
-   *  -                  -    -                  -               -                  -          -                3 -
-   *  - 1              2 -    - 1              2 -               - 1              3 -          - 1                -
-   *  --------------------    --------------------               --------------------          --------------------
+   *
+   *      Default        {LF,RB,LB,RF}         {LF,RF}           {LB,LF}
+   *  LB --------- RB   LB --------- RB    LB --------- RB   LB --------- RB
+   *  |  4       3  |   | 3         2 |    |     <3>     |   | 1           |
+   *  |             |   |             |    |             |   |          <3>|
+   *  |  1       2  |   | 1         4 |    | 1         2 |   | 2           |
+   *  LF --------- RF   LF --------- RF    LF --------- RF   LF --------- RF
    */
-  #define LEVEL_CORNERS_LEVELING_ORDER {1, 3, 4, 2} 
-  #define LEVEL_CORNERS_3_POINTS                  // Level 3 points instead of 4 -> 2 Corners + middle of opposite side
+  #define LEVEL_CORNERS_LEVELING_ORDER { LF, RF, RB, LB }
 #endif
 
 /**
@@ -2408,6 +2413,10 @@
 //#define TFT_CLASSIC_UI
 //#define TFT_COLOR_UI
 //#define TFT_LVGL_UI
+
+#if ENABLED(TFT_LVGL_UI)
+  //#define MKS_WIFI_MODULE  // MKS WiFi module
+#endif
 
 /**
  * TFT Rotation. Set to one of the following values:
