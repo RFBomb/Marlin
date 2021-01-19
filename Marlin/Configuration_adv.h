@@ -808,9 +808,8 @@
 #if ENABLED(ASSISTED_TRAMMING)
 
   // Define positions for probing points, use the hotend as reference not the sensor.
-  #define TramX_Max  X_BED_SIZE - abs(ProbeOffset_X) -5
-  #define TramY_Max  Y_BED_SIZE - abs(ProbeOffset_Y) -15
-  #define TRAMMING_POINT_XY { {X_CENTER, Y_CENTER }, {  15, 15 }, { 15,  TramY_Max }, { TramX_Max , Y_CENTER }}
+  // Used MESH_MAX_X\Y since max probale position was already calculated for UBL  {Bed Center}, {Front Left}, {Rear Left}, {Center Right}
+  #define TRAMMING_POINT_XY { {X_CENTER, Y_CENTER }, {  MESH_MIN_X, MESH_MIN_Y }, { MESH_MIN_X,  MESH_MAX_Y }, { MESH_MAX_X , ((( MESH_MAX_Y  - MESH_MIN_Y ) /2 )  + MESH_MIN_Y ) } }
 
   // Define position names for probe points.
   #define TRAMMING_POINT_NAME_1 "Bed-Center"
@@ -822,8 +821,8 @@
   #define RESTORE_LEVELING_AFTER_G35    // Enable to restore leveling setup after operation
   #define REPORT_TRAMMING_MM          // Report Z deviation (mm) for each point relative to the first
 
-  //#define ASSISTED_TRAMMING_MENU_ITEM // Add a menu item to run G35 Assisted Tramming (MarlinUI)
   #define ASSISTED_TRAMMING_WIZARD    // Make the menu item open a Tramming Wizard sub-menu
+
   #define ASSISTED_TRAMMING_WAIT_POSITION { X_CENTER, Y_BED_SIZE, 15 } // Move the nozzle out of the way for adjustment
 
   /**
@@ -1760,7 +1759,7 @@
  * the probe to be unable to reach any points.
  */
 #if PROBE_SELECTED && !IS_KINEMATIC
-  #define BedClampDistanceFromEdge  12  // This should be the size of the clamps being used + a clearance distance to avoid hitting  them
+  #define BedClampDistanceFromEdge  15  // This should be the size of the clamps being used + a clearance distance to avoid hitting  them
   #define PROBING_MARGIN_LEFT PROBING_MARGIN			//#define PROBING_MARGIN_LEFT PROBING_MARGIN
   #define PROBING_MARGIN_RIGHT PROBING_MARGIN			//#define PROBING_MARGIN_RIGHT PROBING_MARGIN
   #define PROBING_MARGIN_FRONT BedClampDistanceFromEdge	//#define PROBING_MARGIN_FRONT PROBING_MARGIN
@@ -1769,11 +1768,11 @@
 
 #if EITHER(MESH_BED_LEVELING, AUTO_BED_LEVELING_UBL)
 // Override the mesh area if the automatic (max) area is too large
-  #define MESH_MIN_X PROBING_MARGIN_LEFT		//#define MESH_MIN_X MESH_INSET
-  #define MESH_MIN_Y PROBING_MARGIN_RIGHT	  	//#define MESH_MIN_Y MESH_INSET
+  #define MESH_MIN_X _MAX( PROBING_MARGIN_LEFT , X_MIN_POS + ProbeOffset_X )		//#define MESH_MIN_X MESH_INSET
+  #define MESH_MIN_Y PROBING_MARGIN_FRONT	  	//#define MESH_MIN_Y MESH_INSET
   //Compare results of two method and choose smaller mesh to ensure probe can hit all mesh locations
-  #define MESH_MAX_X _MIN( ( X_BED_SIZE - PROBING_MARGIN ) , ( X_MAX_POS + ProbeOffset_X ) )              // #define MESH_MAX_X X_BED_SIZE - (MESH_INSET)
-  #define MESH_MAX_Y _MIN( ( Y_BED_SIZE - BedClampDistanceFromEdge ) , ( Y_MAX_POS + ProbeOffset_Y ) )    // #define MESH_MAX_Y Y_BED_SIZE - (MESH_INSET)
+  #define MESH_MAX_X _MIN( ( X_BED_SIZE - PROBING_MARGIN ) , ( X_MAX_POS + ProbeOffset_X ) , ( X_MAX_POS - MESH_INSET ) )              // #define MESH_MAX_X X_BED_SIZE - (MESH_INSET)
+  #define MESH_MAX_Y _MIN( ( Y_BED_SIZE - BedClampDistanceFromEdge ) , ( Y_MAX_POS + ProbeOffset_Y ), ( Y_MAX_POS - MESH_INSET ) )    // #define MESH_MAX_Y Y_BED_SIZE - (MESH_INSET)
 #endif
 
 #if BOTH(AUTO_BED_LEVELING_UBL, EEPROM_SETTINGS)

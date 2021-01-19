@@ -537,9 +537,9 @@
   //                        {Kp, Ki, Kd }
   //      Gulf Coast bed: {154.51, 30.87 , 515.55}
   //      Stock Ender3 bed: {221.8, 41.42, 791.84}
-  #define DEFAULT_bedKp 154.51
-  #define DEFAULT_bedKi 30.87
-  #define DEFAULT_bedKd 515.55
+  #define DEFAULT_bedKp 132.93
+  #define DEFAULT_bedKi 24.26
+  #define DEFAULT_bedKd 485.63
 
   // FIND YOUR OWN: "M303 E-1 C8 S90" to run autotune on the bed at 90 degreesC for 8 cycles.
 #endif // PIDTEMPBED
@@ -992,7 +992,7 @@
  */
 #define ProbeOffset_X -55.0 //Being used for determining the MESH_MAX_XY values in Configuration_adv.h
 #define ProbeOffset_Y -12.0
-#define NOZZLE_TO_PROBE_OFFSET { ProbeOffset_X, ProbeOffset_Y, -1.75 }
+#define NOZZLE_TO_PROBE_OFFSET { ProbeOffset_X, ProbeOffset_Y, -1.52 }
 
 // Most probes should stay away from the edges of the bed, but
 // with NOZZLE_AS_PROBE this can be negative for a wider probing area.
@@ -1410,7 +1410,7 @@
 
 // !!!! MESH INSET OVERRIDES ARE TURNED ON IN CONFIGURATION_ADV.H  !!!!																	   
   #define MESH_INSET 5              // Set Mesh bounds as an inset region of the bed
-  #define GRID_MAX_POINTS_X 5      // Don't use more than 15 points per axis, implementation limited.
+  #define GRID_MAX_POINTS_X 10      // Don't use more than 15 points per axis, implementation limited.
   #define GRID_MAX_POINTS_Y GRID_MAX_POINTS_X
 
   #define UBL_MESH_EDIT_MOVES_Z     // Sophisticated users prefer no movement of nozzle
@@ -1449,8 +1449,7 @@
 #define LEVEL_BED_CORNERS
 
 #if ENABLED(LEVEL_BED_CORNERS)
-  //#define LEVEL_CORNERS_INSET_LFRB { 5, abs(ProbeOffset_Y) + 3, abs(ProbeOffset_X), 30 } // (mm) Left, Front, Right, Back insets
-  #define LEVEL_CORNERS_INSET_LFRB { 5, abs(ProbeOffset_Y), abs(ProbeOffset_X), 30 } // (mm) Left, Front, Right, Back insets
+  #define LEVEL_CORNERS_INSET_LFRB { MESH_MIN_X, MESH_MIN_Y, MESH_MAX_X, MESH_MAX_Y } // (mm) Left, Front, Right, Back insets
   #define LEVEL_CORNERS_HEIGHT      0.0   // (mm) Z height of nozzle at leveling points
   #define LEVEL_CORNERS_Z_HOP       4.0   // (mm) Z height of nozzle between leveling points
   //#define LEVEL_CENTER_TOO              // Move to the center after the last corner
